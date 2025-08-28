@@ -1,53 +1,51 @@
-
+import streamlit as st
 import speech_recognition as sr
 from deep_translator import GoogleTranslator
-import pyttsx3
 from gtts import gTTS
 import os
 
-def speak_text(text, lang="en"):
-    if lang == "en":
-        # Use pyttsx3 (offline)
-        speaker = pyttsx3.init()
-        speaker.setProperty('rate', 150)
-        speaker.say(text)
-        speaker.runAndWait()
-    else:
-        
-        tts = gTTS(text, lang=lang)
-        tts.save("output.mp3")
-        os.system("start output.mp3")  
-
-def main():
+# Function to record speech
+def record_speech():
     rec = sr.Recognizer()
-    
-    target_lang = input("Enter target language code(en=English,ml=Malayalam,fr=French,hi=Hindi:")
-    
-    translator = GoogleTranslator(source='auto', target=target_lang)
-    
-    print("\nSpeak......")
-    
-    while True:
+    with sr.Microphone() as source:
+        st.info("🎤 Listening... Speak now!")
+        audio = rec.listen(source, timeout=5, phrase_time_limit=10)
         try:
-            with sr.Microphone() as source:
-                rec.adjust_for_ambient_noise(source, duration=0.5)
-                print("Listening...")
-                audio = rec.listen(source, timeout=5, phrase_time_limit=10)
-                print("Analyzing...")
-                text = rec.recognize_google(audio)
-                print("You said:", text)
-                
-                # Translate
-                translation = translator.translate(text)
-                print("Translation:", translation)
-                
-                # Speak translation (auto choose engine)
-                speak_text(translation, target_lang)
-                
-                print("\nSpeak again.....")
+            text = rec.recognize_google(audio)
+            return text
+        except sr.UnknownValueError:
+            st.error("❌ Could not understand audio")
+        except sr.RequestError as e:
+            st.error(f"⚠️ Speech recognition error: {e}")
+    return None
 
-        except Exception as e:
-            print("Error:", str(e))
+# Function to speak text
+def speak_text(text, lang):
+    tts = gTTS(text, lang=lang)
+    tts.save("output.mp3")
+    # Play audio in browser
+    audio_file = open("output.mp3", "rb")
+    st.audio(audio_file.read(), format="audio/mp3")
 
-if __name__ == "__main__":
-    main()
+# Streamlit UI
+st.title("🌍 Live Speech Translator")
+
+# Language selection
+lang = st.selectbox(
+    "Choose target language",
+    ["en", "ml", "hi", "fr", "de", "es"],  # English, Malayalam, Hindi, French, German, Spanish
+    index=1
+)
+
+# Record & Translate button
+if st.button("🎙️ Speak & Translate"):
+    input_text = record_speech()
+    if input_text:
+        st.write("**You said:**", input_text)
+        
+        # Translate
+        translation = GoogleTranslator(source="auto", target=lang).translate(input_text)
+        st.success(f"**Translation:** {translation}")
+        
+        # Speak
+        speak_text(translation, lang)
